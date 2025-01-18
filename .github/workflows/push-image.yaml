@@ -1,11 +1,6 @@
 name: Push Docker Image
 
-on:
-    pull_request: 
-        branches:
-            - main
-            - dev
-    workflow_dispatch: 
+on: [pull_request] 
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -38,7 +33,7 @@ jobs:
         env:
           REGISTRY: ${{ steps.login-to-ecr.outputs.registry }}
           REPOSITORY: github-actions-repo
-          IMAGE_TAG: dev
+          IMAGE_TAG: ${{ env.COMMIT_SHORT_SHA }}
         run: |
           docker build -t github-actions-repo .
           docker tag github-actions-repo:latest $REGISTRY/$REPOSITORY:$IMAGE_TAG
