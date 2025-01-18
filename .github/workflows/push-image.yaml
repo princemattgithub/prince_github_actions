@@ -39,3 +39,5 @@ jobs:
           docker tag github-actions-repo:latest $REGISTRY/$REPOSITORY:$IMAGE_TAG
           docker tag github-actions-repo:latest $REGISTRY/$REPOSITORY:latest
           docker push --all-tags $REGISTRY/$REPOSITORY
+        # Testing 
+        # Testing 2
