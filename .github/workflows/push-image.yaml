@@ -15,19 +15,6 @@ jobs:
   build-push-image:
     timeout-minutes: 15
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        environment: [dev, staging, prod]
-        include:
-          - branch: dev
-            repository: dev-repo
-            tag_prefix: dev
-          - branch: staging
-            repository: staging-repo
-            tag_prefix: staging
-          - branch: main
-            repository: prod-repo
-            tag_prefix: prod
 
     steps:
       - uses: actions/checkout@v4
@@ -48,64 +35,21 @@ jobs:
         run: |
           shortSha=$(git rev-parse --short ${{ github.sha }})
           echo "COMMIT_SHORT_SHA=$shortSha" >> $GITHUB_ENV
-          
+
       - name: Build, tag, and push Docker image to Amazon ECR
         env:
           REGISTRY: ${{ steps.login-to-ecr.outputs.registry }}
-          REPOSITORY: ${{ matrix.repository }}
-          TAG_PREFIX: ${{ matrix.tag_prefix }}
+          REPOSITORY: ${{ github.event.pull_request.base.ref == 'dev' && 'dev-repo' || github.event.pull_request.base.ref == 'staging' && 'staging-repo' || github.event.pull_request.base.ref == 'main' && 'prod-repo' }}
+          TAG_PREFIX: ${{ github.event.pull_request.base.ref }}
           IMAGE_TAG: ${{ env.COMMIT_SHORT_SHA }}
         run: |
-          echo "Building Docker image for ${{ matrix.environment }} environment..."
-          docker build -t $REPOSITORY:${{ env.IMAGE_TAG }} .
-          docker tag $REPOSITORY:${{ env.IMAGE_TAG }} $REGISTRY/$REPOSITORY:${{ env.IMAGE_TAG }}
-          docker tag $REPOSITORY:${{ env.IMAGE_TAG }} $REGISTRY/$REPOSITORY:${{ matrix.tag_prefix }}-latest
-          docker push $REGISTRY/$REPOSITORY:${{ env.IMAGE_TAG }}
-          docker push $REGISTRY/$REPOSITORY:${{ matrix.tag_prefix }}-latest
-          
+          echo "Building Docker image for branch: ${{ github.event.pull_request.base.ref }}..."
+          docker build -t $REPOSITORY:${{ IMAGE_TAG }} .
+          docker tag $REPOSITORY:${{ IMAGE_TAG }} $REGISTRY/$REPOSITORY:${{ IMAGE_TAG }}
+          docker tag $REPOSITORY:${{ IMAGE_TAG }} $REGISTRY/$REPOSITORY:${{ TAG_PREFIX }}-latest
+          docker push $REGISTRY/$REPOSITORY:${{ IMAGE_TAG }}
+          docker push $REGISTRY/$REPOSITORY:${{ TAG_PREFIX }}-latest
+
       - name: Notify Success
         if: success()
-        run: echo "Docker image built and pushed successfully for ${{ matrix.environment }}."
-        
-# name: Push Docker Image
-
-# on: [pull_request] 
-
-# concurrency:
-#   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-#   cancel-in-progress: true
-
-# jobs:
-#   build-push-image:
-#     timeout-minutes: 10
-#     runs-on: ubuntu-latest
-    
-#     steps:
-#       - uses: actions/checkout@v4
-#       - name: Configure AWS credentials
-#         uses: aws-actions/configure-aws-credentials@v4
-#         with:
-#             aws-region: ${{ secrets.AWS_REGION }}
-#             aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#             aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#       - name: Login to Amazon ECR
-#         id: login-to-ecr
-#         uses: aws-actions/amazon-ecr-login@v2
-#       - name: Set short git commit SHA
-#         id: short-sha
-#         run: |
-#           shortSha=$(git rev-parse --short ${{ github.sha }})
-#           echo "COMMIT_SHORT_SHA=$shortSha" >> $GITHUB_ENV
-#           echo "This is the sha: ${{ github.sha }}"
-      
-#       - name: Build, tag, and push docker image to Amazon ECR
-#         env:
-#           REGISTRY: ${{ steps.login-to-ecr.outputs.registry }}
-#           REPOSITORY: github-actions-repo
-#           IMAGE_TAG: ${{ env.COMMIT_SHORT_SHA }}
-#         run: |
-#           docker build -t github-actions-repo .
-#           docker tag github-actions-repo:latest $REGISTRY/$REPOSITORY:$IMAGE_TAG
-#           docker tag github-actions-repo:latest $REGISTRY/$REPOSITORY:latest
-#           docker push --all-tags $REGISTRY/$REPOSITORY
-#       
+        run: echo "Docker image built and pushed successfully for ${{ github.event.pull_request.base.ref }}."
